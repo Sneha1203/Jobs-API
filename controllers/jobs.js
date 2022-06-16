@@ -1,19 +1,60 @@
+const Job = require('../models/Job')
+const {StatusCodes} = require('http-status-codes')
+const {BadRequestError, NotFoundError} = require('../errors')
+
 const getAllJobs = async (request, response) => {
-    response.send('get All Jobs')
+    const jobs = await Job.find({createdBy: request.user.userId}).sort('createdAt')
+    response.status(StatusCodes.OK).json({jobs, count: jobs.length})
+    // response.send('get All Jobs')
 }
 const getJob = async (request, response) => {
-    response.send('get A Jobs')
-}
-const createJob = async (request, response) => {
-    response.json(request.user)
-}
-const updateJob = async (request, response) => {
-    response.send('update a job')
-}
-const deleteJob = async (request, response) => {
-    response.send('delete a job')
+    const {user: {userId}, params: {id: jobId}} = request
+    
+    const job = await Job.findOne({_id: jobId, createdBy: userId})
+
+    if(!job) {
+        throw new NotFoundError(`No job found with job id: ${jobId}`)
+    }
+
+    response.status(StatusCodes.OK).json({ job })
+    // response.send('get A Job')
 }
 
+const createJob = async (request, response) => {
+    request.body.createdBy = request.user.userId
+    const job = await Job.create(request.body)
+    response.status(StatusCodes.CREATED).json({ job })
+}
+
+const updateJob = async (request, response) => {
+    const { body: {company, position}, user: {userId}, params: {id: jobId} } = request
+
+    if(company === '' || position === '') {
+        throw new BadRequestError('Company or Position cannot be empty')
+    }
+
+    const job = await Job.findOneAndUpdate({_id: jobId, createdBy: userId}, request.body, {new: true, runValidators: true})
+
+    if(!job) {
+        throw new NotFoundError(`No job found with job id: ${jobId}`)
+    }
+
+    response.status(StatusCodes.OK).json({ job })
+    // response.send('update a job')
+}
+
+const deleteJob = async (request, response) => {
+    const {user: {userId}, params: {id: jobId}} = request
+    
+    const job = await Job.findOneAndRemove({_id: jobId, createdBy: userId})
+
+    if(!job) {
+        throw new NotFoundError(`No job found with job id: ${jobId}`)
+    }
+
+    response.status(StatusCodes.OK).send()      
+    // response.send('delete a job')
+}
 
 
 module.exports = {
